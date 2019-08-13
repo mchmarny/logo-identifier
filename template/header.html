@@ -1,0 +1,33 @@
+{{ define "header" }}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>LogoID - Cloud Run Logo Identifier App with Google OAuth2 and Cloud Firestore persistence</title>
+    <meta charset="UTF-8">
+    <meta name="description"
+        content="LogoID - Cloud Run Logo Identifier App with Google OAuth2 and Cloud Firestore persistence">
+    <meta name="keywords" content="cloud run, google, oauth, vision, firestore, golang, knative">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="static/img/favicon.ico" rel="shortcut icon" />
+    <link rel="stylesheet" href="static/css/app.css" />
+    <script src="static/js/lib.js"></script>
+    <script src="static/js/app.js"></script>
+</head>
+
+<body>
+
+    <div id="wrapper">
+
+        <!-- Header -->
+        <div id="page-header">
+            <div id="page-header-image">
+                <img src="static/img/google-cloud-run-logo.png" />
+            </div>
+            <div id="page-header-title">
+                Logo Identifier
+            </div>
+        </div>
+
+
+        {{end}}

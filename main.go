@@ -1,33 +1,53 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os"
+
+	ev "github.com/mchmarny/gcputil/env"
+	pj "github.com/mchmarny/gcputil/project"
+)
+
+var (
+	logger    = log.New(os.Stdout, "", 0)
+	projectID = pj.GetIDOrFail()
+	port      = ev.MustGetEnvVar("PORT", "8080")
 )
 
 func main() {
 
-	log.Print("Hello service started")
+	initStore(context.Background())
+	initHandlers()
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Print("Hello service invoked")
-		message := os.Getenv("MESSAGE")
-		fmt.Fprintf(w, "%s\n", message)
+	mux := http.NewServeMux()
+
+	// Static
+	mux.Handle("/static/", http.StripPrefix("/static/",
+		http.FileServer(http.Dir("static"))))
+
+	// Handlers
+	mux.HandleFunc("/", defaultHandler)
+	mux.HandleFunc("/auth/login", authLoginHandler)
+	mux.HandleFunc("/auth/callback", authCallbackHandler)
+	mux.HandleFunc("/auth/logout", logOutHandler)
+	mux.HandleFunc("/view", viewHandler)
+	mux.HandleFunc("/logo", logoHandler)
+	mux.HandleFunc("/_health", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, "ok")
 	})
 
-	// Set HTTP listening port
-	// https://cloud.google.com/run/docs/reference/container-contract#port
-	httpPort := os.Getenv("PORT")
-	if httpPort == "" {
-		httpPort = "8080"
+	// Server
+	hostPort := net.JoinHostPort("0.0.0.0", port)
+	server := &http.Server{
+		Addr:    hostPort,
+		Handler: mux,
 	}
 
-	hostPost := net.JoinHostPort("0.0.0.0", httpPort)
+	logger.Printf("Server starting: %s \n", hostPort)
+	logger.Fatal(server.ListenAndServe())
 
-	if err := http.ListenAndServe(hostPost, nil); err != nil {
-		log.Fatal(err)
-	}
 }

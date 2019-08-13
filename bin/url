@@ -1,5 +1,10 @@
 #!/bin/bash
 
-echo $(gcloud beta run services describe gorunstarter \
-    --region us-central1 \
-    --format="value(status.domain)")
+DIR="$(dirname "$0")"
+. "${DIR}/config"
+
+
+gcloud beta run services describe $SERVICE_NAME \
+    --region $SERVICE_REGION \
+    --platform managed \
+    --format "value(status.domain)"
