@@ -33,7 +33,7 @@ func getCurrentUserID(r *http.Request) string {
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
 
 	data := make(map[string]interface{})
-	data["version"] = ev.MustGetEnvVar("RELEASE", "NOT SET")
+	data["version"] = ev.MustGetEnvVar("RELEASE", "v0.0.1-manual")
 
 	if err := templates.ExecuteTemplate(w, "index", data); err != nil {
 		logger.Printf("Error in index template: %s", err)
