@@ -49,6 +49,6 @@ gcloud projects add-iam-policy-binding $PROJECT \
 	--member "serviceAccount:${SERVICE_NAME}-sa@${PROJECT}.iam.gserviceaccount.com" \
     --role roles/monitoring.metricWriter
 
-gcloud spanner instances add-iam-policy-binding test-instance \
+gcloud spanner instances add-iam-policy-binding $SERVICE_NAME \
     --member "serviceAccount:${SERVICE_NAME}-sa@${PROJECT}.iam.gserviceaccount.com" \
     --role roles/spanner.databaseUser

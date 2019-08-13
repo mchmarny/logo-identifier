@@ -9,4 +9,4 @@ gcloud beta run deploy $SERVICE_NAME \
 	--allow-unauthenticated \
     --platform managed \
 	--region $SERVICE_REGION \
-	--set-env-vars "TOPIC=${SERVICE_NAME},HOOK_SECRET=${HOOK_SECRET}"
+	--set-env-vars "DB_ID=projects/${PROJECT}/instances/${SERVICE_NAME}/databases/${SERVICE_NAME}-db,OAUTH_CLIENT_ID=${LI_OAUTH_CLIENT_ID},OAUTH_CLIENT_SECRET=${LI_OAUTH_CLIENT_SECRET}"

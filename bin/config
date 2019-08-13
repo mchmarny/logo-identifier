@@ -3,7 +3,7 @@
 # Global config
 SERVICE_NAME="logo-identifier"
 SERVICE_REGION="us-central1"
-SERVICE_VERSION="0.4.4"
+SERVICE_VERSION="0.2.2"
 
 # GCP metadata
 PROJECT=$(gcloud config get-value project)
