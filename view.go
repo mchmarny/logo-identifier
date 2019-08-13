@@ -75,9 +75,11 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO: Refactor to pass whole object
 	data["name"] = usr.UserName
 	data["email"] = usr.Email
 	data["pic"] = usr.Picture
+
 	data["version"] = ev.MustGetEnvVar("RELEASE", "NOT SET")
 
 	logger.Printf("Data: %v", data)
