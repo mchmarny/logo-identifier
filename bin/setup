@@ -5,28 +5,27 @@ DIR="$(dirname "$0")"
 
 # Required services
 gcloud services enable --quiet \
-    bigquery-json.googleapis.com \
-    bigquerystorage.googleapis.com \
     compute.googleapis.com \
     cloudbuild.googleapis.com \
-    dataflow.googleapis.com \
     iam.googleapis.com \
-    pubsub.googleapis.com \
+    containerregistry.googleapis.com \
+    spanner.googleapis.com \
     run.googleapis.com
 
-# PubSub
-gcloud pubsub topics create $SERVICE_NAME
 
-# BigQuery
-bq mk $SERVICE_NAME
-bq mk --schema id:string,repo:string,type:string,actor:string,event_time:timestamp,countable:boolean \
-      -t "${SERVICE_NAME}.events"
+# SQL
+gcloud spanner instances create $SERVICE_NAME \
+    --description "DB for ${SERVICE_NAME}" \
+    --nodes 1 \
+    --config "regional-${SERVICE_REGION}"
 
-# Dataflow
-gcloud dataflow jobs run $SERVICE_NAME \
-    	--gcs-location gs://dataflow-templates/latest/PubSub_to_BigQuery \
-        --region $SERVICE_REGION \
-    	--parameters "inputTopic=projects/${PROJECT}/topics/${SERVICE_NAME},outputTableSpec=${PROJECT}:${SERVICE_NAME}.events"
+gcloud spanner databases create "${SERVICE_NAME}-db" \
+    --instance $SERVICE_NAME
+
+gcloud spanner databases ddl update "${SERVICE_NAME}-db" \
+    --instance $SERVICE_NAME \
+    --ddl "$(<schema.ddl)"
+
 
 # Account
 gcloud iam service-accounts create "${SERVICE_NAME}-sa" \
@@ -34,13 +33,9 @@ gcloud iam service-accounts create "${SERVICE_NAME}-sa" \
     --quiet
 
 gcloud beta run services add-iam-policy-binding $SERVICE_NAME \
-	--member="serviceAccount:${SERVICE_NAME}-sa@${PROJECT}.iam.gserviceaccount.com" \
-	--region="${SERVICE_REGION}" \
-	--role=roles/run.invoker
-
-gcloud projects add-iam-policy-binding $PROJECT \
-    --member "serviceAccount:${SERVICE_NAME}-sa@${PROJECT}.iam.gserviceaccount.com" \
-    --role roles/pubsub.publisher
+	--member "serviceAccount:${SERVICE_NAME}-sa@${PROJECT}.iam.gserviceaccount.com" \
+	--region "${SERVICE_REGION}" \
+	--role roles/run.invoker
 
 gcloud projects add-iam-policy-binding $PROJECT \
 	--member "serviceAccount:${SERVICE_NAME}-sa@${PROJECT}.iam.gserviceaccount.com" \
@@ -53,3 +48,7 @@ gcloud projects add-iam-policy-binding $PROJECT \
 gcloud projects add-iam-policy-binding $PROJECT \
 	--member "serviceAccount:${SERVICE_NAME}-sa@${PROJECT}.iam.gserviceaccount.com" \
     --role roles/monitoring.metricWriter
+
+gcloud spanner instances add-iam-policy-binding test-instance \
+    --member "serviceAccount:${SERVICE_NAME}-sa@${PROJECT}.iam.gserviceaccount.com" \
+    --role roles/spanner.databaseUser

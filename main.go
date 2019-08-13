@@ -20,7 +20,9 @@ var (
 
 func main() {
 
-	initStore(context.Background())
+	ctx := context.Background()
+	initStore(ctx)
+	defer closeStore(ctx)
 	initHandlers()
 
 	mux := http.NewServeMux()

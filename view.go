@@ -75,7 +75,7 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data["name"] = usr.Name
+	data["name"] = usr.UserName
 	data["email"] = usr.Email
 	data["pic"] = usr.Picture
 	data["version"] = ev.MustGetEnvVar("RELEASE", "NOT SET")
@@ -115,12 +115,12 @@ func logoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	event := &UserEvent{
-		ID:     makeUUID(),
-		On:     time.Now(),
-		UserID: uid,
-		Image:  imageURL,
-		Result: result,
+	event := &UserQuery{
+		QueryID:  makeUUID(),
+		Created:  time.Now(),
+		UserID:   uid,
+		ImageURL: imageURL,
+		Result:   result,
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -131,7 +131,7 @@ func logoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = saveEvent(r.Context(), event)
+	err = saveQuery(r.Context(), event)
 	if err != nil {
 		logger.Printf("Error while saving logo event: %v", err)
 		w.WriteHeader(http.StatusBadRequest)

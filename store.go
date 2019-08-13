@@ -3,59 +3,49 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
-	"cloud.google.com/go/firestore"
-	"google.golang.org/api/iterator"
-)
-
-const (
-	userCollectionName  = "logo-identifier-user"
-	eventCollectionName = "logo-identifier-event"
+	"cloud.google.com/go/spanner"
+	ev "github.com/mchmarny/gcputil/env"
+	"google.golang.org/grpc/codes"
 )
 
 var (
-	fsClient     *firestore.Client
-	userColl     *firestore.CollectionRef
-	eventColl    *firestore.CollectionRef
-	errNilDocRef = errors.New("firestore: nil DocumentRef")
+	dbClient *spanner.Client
+	dbID     = ev.MustGetEnvVar("DB_ID", "")
 )
 
 // ServiceUser represents service input
 type ServiceUser struct {
-	ID      string    `json:"id" firestore:"id"`
-	Email   string    `json:"email" firestore:"email"`
-	Name    string    `json:"name" firestore:"name"`
-	Created time.Time `json:"created" firestore:"created"`
-	Updated time.Time `json:"updated" firestore:"updated"`
-	Picture string    `json:"pic" firestore:"pic"`
+	UserID   string    `json:"id" spanner:"UserId"`
+	Email    string    `json:"email" spanner:"Email"`
+	UserName string    `json:"user" spanner:"UserName"`
+	Created  time.Time `json:"created" spanner:"Created"`
+	Updated  time.Time `json:"updated" spanner:"Updated"`
+	Picture  string    `json:"pic" spanner:"Picture"`
 }
 
-// UserEvent represents service input
-type UserEvent struct {
-	ID     string    `json:"id" firestore:"id"`
-	UserID string    `json:"user" firestore:"user"`
-	On     time.Time `json:"ts" firestore:"ts"`
-	Image  string    `json:"image" firestore:"image"`
-	Result string    `json:"result" firestore:"result"`
+// UserQuery represents service input
+type UserQuery struct {
+	UserID   string    `json:"userId" spanner:"UserId"`
+	QueryID  string    `json:"queryId" spanner:"QueryId"`
+	Created  time.Time `json:"created" spanner:"Created"`
+	ImageURL string    `json:"image" spanner:"ImageUrl"`
+	Result   string    `json:"result" spanner:"Result"`
 }
 
 func initStore(ctx context.Context) {
-
-	// in case called multiple times during test
-	if eventColl != nil && userColl != nil && fsClient != nil {
-		return
-	}
-
-	// Assumes GOOGLE_APPLICATION_CREDENTIALS is set
-	c, err := firestore.NewClient(ctx, projectID)
+	c, err := spanner.NewClient(ctx, dbID)
 	if err != nil {
-		logger.Fatalf("Error while creating Firestore client: %v", err)
+		logger.Fatalf("Error while initializing db client: %v", err)
 	}
-	fsClient = c
-	userColl = c.Collection(userCollectionName)
-	eventColl = c.Collection(eventCollectionName)
+	dbClient = c
+}
+
+func closeStore(ctx context.Context) {
+	if dbClient != nil {
+		dbClient.Close()
+	}
 }
 
 func getUser(ctx context.Context, id string) (usr *ServiceUser, err error) {
@@ -64,17 +54,23 @@ func getUser(ctx context.Context, id string) (usr *ServiceUser, err error) {
 		return nil, errors.New("Nil job ID parameter")
 	}
 
-	d, err := userColl.Doc(id).Get(ctx)
+	row, err := dbClient.Single().ReadRow(ctx, "Users", spanner.Key{id},
+		[]string{"UserId", "Email", "UserName", "Created", "Updated", "Picture"})
+
 	if err != nil {
-		if err == errNilDocRef {
-			return nil, fmt.Errorf("No user for ID: %s", id)
+		if spanner.ErrCode(err) == codes.NotFound {
+			logger.Printf("User not found: %s", id)
+			return nil, nil
 		}
+
+		logger.Printf("Error while quering for user %s: %v", id, err)
 		return nil, err
 	}
 
 	var u ServiceUser
-	if err := d.DataTo(&u); err != nil {
-		return nil, fmt.Errorf("Stored data not user: %v", err)
+	if err := row.ToStruct(&u); err != nil {
+		logger.Printf("Error while parsing DB user: %v", err)
+		return nil, err
 	}
 
 	return &u, nil
@@ -83,66 +79,46 @@ func getUser(ctx context.Context, id string) (usr *ServiceUser, err error) {
 
 func saveUser(ctx context.Context, usr *ServiceUser) error {
 
-	if usr == nil || usr.ID == "" {
+	if usr == nil || usr.UserID == "" {
 		logger.Println("nil id on user save")
-		return errors.New("Nil ID")
+		return errors.New("User required")
 	}
 
-	_, err := userColl.Doc(usr.ID).Set(ctx, usr)
+	m, err := spanner.InsertOrUpdateStruct("Users", usr)
 	if err != nil {
-		logger.Printf("error on save: %v", err)
-		return fmt.Errorf("Error on save: %v", err)
-	}
-
-	return nil
-
-}
-
-func saveEvent(ctx context.Context, event *UserEvent) error {
-
-	if event == nil || event.ID == "" {
-		logger.Println("nil id on event save")
-		return errors.New("Nil ID")
-	}
-
-	_, err := eventColl.Doc(event.ID).Set(ctx, event)
-	if err != nil {
-		logger.Printf("error on save: %v", err)
-		return fmt.Errorf("Error on save: %v", err)
-	}
-
-	return nil
-
-}
-
-func deleteUser(ctx context.Context, id string) error {
-
-	if id == "" {
-		return errors.New("Nil job ID parameter")
-	}
-
-	batch := fsClient.Batch()
-	doc, err := userColl.Doc(id).Get(ctx)
-	if err != nil {
-		logger.Printf("Error on doc get: %v", err)
+		logger.Printf("Error while creating Users insert: %v", err)
 		return err
 	}
-	batch.Delete(doc.Ref)
 
-	iter := eventColl.Where("userId", "==", id).Documents(ctx)
-	for {
-		doc, err := iter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			logger.Printf("Error on iter next: %v", err)
-			return err
-		}
-		batch.Delete(doc.Ref)
+	return dbApply(ctx, m)
+
+}
+
+func saveQuery(ctx context.Context, q *UserQuery) error {
+
+	if q == nil || q.QueryID == "" {
+		logger.Println("nil id on query save")
+		return errors.New("ID required")
 	}
 
-	_, err = batch.Commit(ctx)
-	return err
+	m, err := spanner.InsertStruct("Queries", q)
+	if err != nil {
+		logger.Printf("Error while creating Users insert: %v", err)
+		return err
+	}
+
+	return dbApply(ctx, m)
+
+}
+
+func dbApply(ctx context.Context, m *spanner.Mutation) error {
+
+	_, err := dbClient.Apply(ctx, []*spanner.Mutation{m}, spanner.ApplyAtLeastOnce())
+	if err != nil {
+		logger.Printf("Error while applying user to DB: %v", err)
+		return err
+	}
+
+	return nil
 
 }

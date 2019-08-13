@@ -11,22 +11,22 @@ import (
 
 func getTestUserFromID(id string) *ServiceUser {
 	return &ServiceUser{
-		ID:      id,
-		Email:   fmt.Sprintf("id-%s@domain.com", id),
-		Name:    "Test User",
-		Created: time.Now(),
-		Updated: time.Now(),
-		Picture: "http://invalid.domain.com/pic1",
+		UserID:   id,
+		Email:    fmt.Sprintf("id-%s@domain.com", id),
+		UserName: "Test User",
+		Created:  time.Now(),
+		Updated:  time.Now(),
+		Picture:  "http://invalid.domain.com/pic1",
 	}
 }
 
-func getTestEvent(userID, id string) *UserEvent {
-	return &UserEvent{
-		ID:     id,
-		UserID: userID,
-		On:     time.Now(),
-		Image:  "d1",
-		Result: "v1",
+func getTestEvent(userID, id string) *UserQuery {
+	return &UserQuery{
+		QueryID:  id,
+		UserID:   userID,
+		Created:  time.Now(),
+		ImageURL: "d1",
+		Result:   "v1",
 	}
 }
 
@@ -38,6 +38,7 @@ func TestUser(t *testing.T) {
 
 	ctx := context.Background()
 	initStore(ctx)
+	defer closeStore(ctx)
 
 	// create
 	usr := getTestUserFromID("store-123")
@@ -45,22 +46,18 @@ func TestUser(t *testing.T) {
 	assert.Nil(t, err)
 
 	// get
-	usr2, err := getUser(ctx, usr.ID)
+	usr2, err := getUser(ctx, usr.UserID)
 	assert.Nil(t, err)
 	assert.NotNil(t, usr2)
-	assert.Equalf(t, usr.ID, usr2.ID, "Users' ID don't equal %s != %s", usr.ID, usr2.ID)
+	assert.Equalf(t, usr.UserID, usr2.UserID, "Users' ID don't equal %s != %s", usr.UserID, usr2.UserID)
 
 	// create events for user
-	event1 := getTestEvent(usr2.ID, "e1")
-	err = saveEvent(ctx, event1)
+	e1 := getTestEvent(usr2.UserID, "e1")
+	err = saveQuery(ctx, e1)
 	assert.Nil(t, err)
 
-	event2 := getTestEvent(usr2.ID, "e2")
-	err = saveEvent(ctx, event2)
-	assert.Nil(t, err)
-
-	// delete user and its events
-	err = deleteUser(ctx, usr2.ID)
+	e2 := getTestEvent(usr2.UserID, "e2")
+	err = saveQuery(ctx, e2)
 	assert.Nil(t, err)
 
 }

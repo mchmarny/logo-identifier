@@ -107,12 +107,12 @@ func authCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Printf("UserID: %s", userID)
 
 	usrData := &ServiceUser{
-		ID:      userID,
-		Email:   email.(string),
-		Name:    fmt.Sprintf("%s %s", dataMap["given_name"], dataMap["family_name"]),
-		Created: time.Now(),
-		Updated: time.Now(),
-		Picture: pic.(string),
+		UserID:   userID,
+		Email:    email.(string),
+		UserName: fmt.Sprintf("%s %s", dataMap["given_name"], dataMap["family_name"]),
+		Created:  time.Now(),
+		Updated:  time.Now(),
+		Picture:  pic.(string),
 	}
 	logger.Printf("User Data: %+v", usrData)
 
