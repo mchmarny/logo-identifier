@@ -16,6 +16,7 @@ import (
 	"golang.org/x/oauth2/google"
 
 	ev "github.com/mchmarny/gcputil/env"
+	me "github.com/mchmarny/gcputil/metric"
 )
 
 const (
@@ -29,7 +30,16 @@ var (
 	longTimeAgo    = time.Duration(3650 * 24 * time.Hour)
 	cookieDuration = time.Duration(30 * 24 * time.Hour)
 	oauthConfig    *oauth2.Config
+	metricClient   *me.Client
 )
+
+func initAuth(ctx context.Context) {
+	c, err := me.NewClient(ctx)
+	if err != nil {
+		logger.Fatalf("Error while initializing metrics client %v", err)
+	}
+	metricClient = c
+}
 
 func getOAuthConfig(r *http.Request) *oauth2.Config {
 
@@ -121,6 +131,11 @@ func authCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Printf("Error while saving data: %v", err)
 		errorHandler(w, r, err, http.StatusInternalServerError)
 		return
+	}
+
+	err = metricClient.Publish(r.Context(), appName, "user-auth", int64(1))
+	if err != nil {
+		logger.Printf("Error while publishing metrics: %v", err)
 	}
 
 	// set cookie for 30 days

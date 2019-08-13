@@ -140,4 +140,9 @@ func logoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = metricClient.Publish(r.Context(), appName, "user-query", int64(1))
+	if err != nil {
+		logger.Printf("Error while publishing metrics: %v", err)
+	}
+
 }

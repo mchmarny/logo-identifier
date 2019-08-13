@@ -12,6 +12,10 @@ import (
 	pj "github.com/mchmarny/gcputil/project"
 )
 
+const (
+	appName = "logo-identifier"
+)
+
 var (
 	logger    = log.New(os.Stdout, "", 0)
 	projectID = pj.GetIDOrFail()
@@ -21,6 +25,7 @@ var (
 func main() {
 
 	ctx := context.Background()
+	initAuth(ctx)
 	initStore(ctx)
 	defer closeStore(ctx)
 	initHandlers()
