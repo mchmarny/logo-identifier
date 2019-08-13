@@ -33,16 +33,21 @@ func getTestEvent(userID, id string) *UserQuery {
 func TestUser(t *testing.T) {
 
 	if testing.Short() {
-		t.Skip("Skipping TestSaveUser")
+		t.Skip("Skipping TestUser")
 	}
 
 	ctx := context.Background()
 	initStore(ctx)
 	defer closeStore(ctx)
 
-	// create
 	usr := getTestUserFromID("store-123")
-	err := saveUser(ctx, usr)
+
+	// reset
+	err := deleteUser(ctx, usr.UserID)
+	assert.Nil(t, err)
+
+	// create
+	err = saveUser(ctx, usr)
 	assert.Nil(t, err)
 
 	// get

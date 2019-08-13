@@ -77,6 +77,29 @@ func getUser(ctx context.Context, id string) (usr *ServiceUser, err error) {
 
 }
 
+func deleteUser(ctx context.Context, id string) error {
+
+	if id == "" {
+		logger.Println("nil id on user delete")
+		return errors.New("User required")
+	}
+
+	m := spanner.Delete("Users", spanner.Key{id})
+
+	_, err := dbClient.Apply(ctx, []*spanner.Mutation{m}, spanner.ApplyAtLeastOnce())
+	if err != nil {
+		if spanner.ErrCode(err) == codes.NotFound {
+			logger.Printf("User not found: %s", id)
+			return nil
+		}
+		logger.Printf("Error while applying user to DB: %v", err)
+		return err
+	}
+
+	return nil
+
+}
+
 func saveUser(ctx context.Context, usr *ServiceUser) error {
 
 	if usr == nil || usr.UserID == "" {

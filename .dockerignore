@@ -5,3 +5,4 @@ coverage.out
 /bin
 README.md
 *_test.go
+app

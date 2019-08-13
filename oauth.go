@@ -16,7 +16,6 @@ import (
 	"golang.org/x/oauth2/google"
 
 	ev "github.com/mchmarny/gcputil/env"
-	me "github.com/mchmarny/gcputil/metric"
 )
 
 const (
@@ -30,16 +29,7 @@ var (
 	longTimeAgo    = time.Duration(3650 * 24 * time.Hour)
 	cookieDuration = time.Duration(30 * 24 * time.Hour)
 	oauthConfig    *oauth2.Config
-	metricClient   *me.Client
 )
-
-func initAuth(ctx context.Context) {
-	c, err := me.NewClient(ctx)
-	if err != nil {
-		logger.Fatalf("Error while initializing metrics client %v", err)
-	}
-	metricClient = c
-}
 
 func getOAuthConfig(r *http.Request) *oauth2.Config {
 

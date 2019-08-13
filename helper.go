@@ -1,18 +1,33 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
+	me "github.com/mchmarny/gcputil/metric"
 )
 
 const (
-	idPrefix = "id-"
+	idPrefix       = "id-"
 	imageNameSufix = "/photo.jpg"
 )
+
+var (
+	metricClient *me.Client
+)
+
+func initAuth(ctx context.Context) {
+	c, err := me.NewClient(ctx)
+	if err != nil {
+		logger.Fatalf("Error while initializing metrics client %v", err)
+	}
+	metricClient = c
+}
 
 func serverSizeResizePlusPic(picURL string, size int) string {
 
@@ -27,6 +42,12 @@ func serverSizeResizePlusPic(picURL string, size int) string {
 
 	return strings.Replace(picURL, imageNameSufix, sizedImageName, -1)
 
+}
+
+func makeDailySessionID(email string) string {
+	emailID := makeID(email)
+	datePrefix := time.Now().UTC().Format("2006-01-02")
+	return fmt.Sprintf("s-%s-%s", datePrefix, emailID)
 }
 
 func makeID(email string) string {
