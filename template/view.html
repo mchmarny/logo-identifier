@@ -21,7 +21,10 @@
                 <div class="logout">
                     <a href="/auth/logout" id="logout-button">Sign Out</a>
                 </div>
-
+                <div class="sessions" id="session-state">
+                    Daily Queries:
+                    {{.queryCount}}/{{.queryLimit}}
+                </div>
             </td>
             <td class="right-col">
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -31,14 +30,14 @@ func initAuth(ctx context.Context) {
 
 func serverSizeResizePlusPic(picURL string, size int) string {
 
-	log.Printf("URL: %s", picURL)
+	logger.Printf("URL: %s", picURL)
 	if !strings.HasSuffix(picURL, imageNameSufix) {
-		log.Printf("Not valid profile picture format")
+		logger.Printf("Not valid profile picture format")
 		return picURL
 	}
 
 	sizedImageName := fmt.Sprintf("/s%d%s", size, imageNameSufix)
-	log.Printf("Sized image name: %s", sizedImageName)
+	logger.Printf("Sized image name: %s", sizedImageName)
 
 	return strings.Replace(picURL, imageNameSufix, sizedImageName, -1)
 
@@ -86,7 +85,7 @@ func parseEmail(id string) (email string, err error) {
 func makeUUID() string {
 	id, err := uuid.NewUUID()
 	if err != nil {
-		log.Fatalf("Error while getting id: %v\n", err)
+		logger.Fatalf("Error while getting id: %v\n", err)
 	}
 	return idPrefix + id.String()
 }

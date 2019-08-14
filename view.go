@@ -11,7 +11,8 @@ import (
 )
 
 var (
-	templates *template.Template
+	templates  *template.Template
+	queryLimit = ev.MustGetIntEnvVar("QUERY_LIMIT", 50)
 )
 
 func initHandlers() {
@@ -75,12 +76,17 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sessionID := makeDailySessionID(usr.UserID)
+	sessionCount, err := countSession(r.Context(), usr.UserID, sessionID)
+
 	// TODO: Refactor to pass whole object
 	data["name"] = usr.UserName
 	data["email"] = usr.Email
 	data["pic"] = usr.Picture
+	data["queryCount"] = sessionCount
+	data["queryLimit"] = queryLimit
 
-	data["version"] = ev.MustGetEnvVar("RELEASE", "NOT SET")
+	data["version"] = ev.MustGetEnvVar("RELEASE", "v0.0.1-manual")
 
 	logger.Printf("Data: %v", data)
 
@@ -117,12 +123,22 @@ func logoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sid := makeDailySessionID(uid)
+	queryCount, err := countSession(r.Context(), uid, sid)
+	if err != nil {
+		logger.Printf("Error while incrementing query count: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	event := &UserQuery{
-		QueryID:  makeUUID(),
-		Created:  time.Now(),
-		UserID:   uid,
-		ImageURL: imageURL,
-		Result:   result,
+		QueryID:    makeUUID(),
+		Created:    time.Now(),
+		UserID:     uid,
+		ImageURL:   imageURL,
+		Result:     result,
+		QueryCount: queryCount,
+		QueryLimit: int64(queryLimit),
 	}
 
 	w.WriteHeader(http.StatusOK)

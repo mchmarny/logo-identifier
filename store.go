@@ -27,11 +27,13 @@ type ServiceUser struct {
 
 // UserQuery represents service input
 type UserQuery struct {
-	UserID   string    `json:"userId" spanner:"UserId"`
-	QueryID  string    `json:"queryId" spanner:"QueryId"`
-	Created  time.Time `json:"created" spanner:"Created"`
-	ImageURL string    `json:"image" spanner:"ImageUrl"`
-	Result   string    `json:"result" spanner:"Result"`
+	UserID     string    `json:"userId" spanner:"UserId"`
+	QueryID    string    `json:"queryId" spanner:"QueryId"`
+	Created    time.Time `json:"created" spanner:"Created"`
+	ImageURL   string    `json:"image" spanner:"ImageUrl"`
+	Result     string    `json:"result" spanner:"Result"`
+	QueryCount int64     `json:"queryCount" spanner:"-"`
+	QueryLimit int64     `json:"queryLimit" spanner:"-"`
 }
 
 func initStore(ctx context.Context) {
@@ -131,6 +133,49 @@ func saveQuery(ctx context.Context, q *UserQuery) error {
 	}
 
 	return dbApply(ctx, m)
+
+}
+
+func countSession(ctx context.Context, userID, sessionID string) (c int64, err error) {
+
+	if sessionID == "" || userID == "" {
+		logger.Println("Either user or session ID required")
+		return 0, errors.New("Both, user and session ID required")
+	}
+
+	var sessionCount int64
+	_, err = dbClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		row, err := txn.ReadRow(ctx, "Sessions", spanner.Key{sessionID}, []string{"UserCount"})
+		if err != nil {
+			if spanner.ErrCode(err) == codes.NotFound {
+				logger.Printf("No sessions for this user: %s", sessionID)
+				return txn.BufferWrite([]*spanner.Mutation{
+					spanner.Insert("Sessions", []string{"SessionId", "UserId", "UserCount"},
+						[]interface{}{
+							sessionID,
+							userID,
+							int64(1),
+						}),
+				})
+			}
+		}
+		if err := row.Column(0, &sessionCount); err != nil {
+			return err
+		}
+		return txn.BufferWrite([]*spanner.Mutation{
+			spanner.Update("Sessions", []string{"SessionId", "UserId", "UserCount"},
+				[]interface{}{
+					sessionID,
+					userID,
+					sessionCount + int64(1),
+				}),
+		})
+	})
+	if err != nil {
+		logger.Printf("Error on count transaction: %v", err)
+	}
+
+	return sessionCount, err
 
 }
 

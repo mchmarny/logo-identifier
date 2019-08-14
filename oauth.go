@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"time"
 
@@ -145,7 +144,7 @@ func authCallbackHandler(w http.ResponseWriter, r *http.Request) {
 func logOutHandler(w http.ResponseWriter, r *http.Request) {
 
 	uid := getCurrentUserID(r)
-	log.Printf("User logging out: %s", uid)
+	logger.Printf("User logging out: %s", uid)
 
 	cookie := http.Cookie{
 		Name:    userIDCookieName,

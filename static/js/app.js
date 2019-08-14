@@ -15,6 +15,7 @@ $(function () {
         $.get("/logo?imageUrl=" + imgUrl, function (data) {
             console.log(data);
             $("#logo-result-text").html("<b>Result:</b> " + data.result);
+            $("#session-state").html("Daily Queries: " + data.queryCount + "/" + data.queryLimit);
         });
     });
 

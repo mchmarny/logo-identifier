@@ -30,6 +30,27 @@ func getTestEvent(userID, id string) *UserQuery {
 	}
 }
 
+func TestSession(t *testing.T) {
+
+	ctx := context.Background()
+	initStore(ctx)
+	defer closeStore(ctx)
+
+	uid := makeID("session-user@domain.com")
+	sid := makeDailySessionID(uid)
+	assert.NotNil(t, uid)
+	assert.NotNil(t, sid)
+
+	c1, err := countSession(ctx, uid, sid)
+	assert.Nil(t, err)
+	assert.True(t, c1 > -1, "Invalid session count: %d", c1)
+
+	c2, err := countSession(ctx, uid, sid)
+	assert.Nil(t, err)
+	assert.True(t, c2 == c1+1, "Session count not incremented: %d", c1)
+
+}
+
 func TestUser(t *testing.T) {
 
 	if testing.Short() {
