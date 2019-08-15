@@ -1,9 +1,11 @@
 #!/bin/bash
 
 # Global config
-SERVICE_NAME="logo-identifier"
+SERVICE_NAME="logoider"
 SERVICE_REGION="us-central1"
-SERVICE_VERSION="0.2.5"
+DB_TIER="db-n1-highmem-2"
+SERVICE_VERSION="0.2.6"
+
 
 # GCP metadata
 PROJECT=$(gcloud config get-value project)

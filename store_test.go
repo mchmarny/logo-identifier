@@ -41,7 +41,12 @@ func TestSession(t *testing.T) {
 	assert.NotNil(t, uid)
 	assert.NotNil(t, sid)
 
-	c1, err := countSession(ctx, uid, sid)
+	usr := getTestUserFromID("session-user-123")
+	assert.NotNil(t, usr)
+	err := saveUser(ctx, usr)
+	assert.Nil(t, err)
+
+	c1, err := countSession(ctx, usr.UserID, sid)
 	assert.Nil(t, err)
 	assert.True(t, c1 > -1, "Invalid session count: %d", c1)
 

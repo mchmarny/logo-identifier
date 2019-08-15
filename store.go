@@ -3,80 +3,112 @@ package main
 import (
 	"context"
 	"errors"
-	"time"
 
-	"cloud.google.com/go/spanner"
 	ev "github.com/mchmarny/gcputil/env"
-	"google.golang.org/grpc/codes"
+
+	"database/sql"
+
+	_ "github.com/GoogleCloudPlatform/cloudsql-proxy/proxy/dialers/mysql"
+	_ "github.com/go-sql-driver/mysql"
 )
+
+type mysqlDB struct {
+	conn            *sql.DB
+	getUser         *sql.Stmt
+	deleteUser      *sql.Stmt
+	saveUser        *sql.Stmt
+	saveQuery       *sql.Stmt
+	addSession      *sql.Stmt
+	getSessionCount *sql.Stmt
+}
 
 var (
-	dbClient *spanner.Client
-	dbID     = ev.MustGetEnvVar("DB_ID", "")
+	db  *mysqlDB
+	dsn = ev.MustGetEnvVar("DSN", "")
 )
 
-// ServiceUser represents service input
-type ServiceUser struct {
-	UserID   string    `json:"id" spanner:"UserId"`
-	Email    string    `json:"email" spanner:"Email"`
-	UserName string    `json:"name" spanner:"UserName"`
-	Created  time.Time `json:"created" spanner:"Created"`
-	Updated  time.Time `json:"updated" spanner:"Updated"`
-	Picture  string    `json:"pic" spanner:"Picture"`
-}
-
-// UserQuery represents service input
-type UserQuery struct {
-	UserID     string    `json:"userId" spanner:"UserId"`
-	QueryID    string    `json:"queryId" spanner:"QueryId"`
-	Created    time.Time `json:"created" spanner:"Created"`
-	ImageURL   string    `json:"image" spanner:"ImageUrl"`
-	Result     string    `json:"result" spanner:"Result"`
-	QueryCount int64     `json:"queryCount" spanner:"-"`
-	QueryLimit int64     `json:"queryLimit" spanner:"-"`
-}
-
 func initStore(ctx context.Context) {
-	c, err := spanner.NewClient(ctx, dbID)
+
+	c, err := sql.Open("mysql", dsn)
 	if err != nil {
-		logger.Fatalf("Error while initializing db client: %v", err)
+		logger.Fatalf("Error connecting to DB: %v", err)
 	}
-	dbClient = c
+
+	if err := c.Ping(); err != nil {
+		c.Close()
+		logger.Fatalf("Error connecting to DB: %v", err)
+	}
+
+	db = &mysqlDB{
+		conn: c,
+	}
+
+	if db.getUser, err = c.Prepare(`SELECT
+		user_id, email, user_name, created, updated, pic_url
+		FROM users WHERE user_id=?`); err != nil {
+		logger.Fatalf("Error on selectUser prepare: %v", err)
+	}
+
+	if db.deleteUser, err = c.Prepare("DELETE FROM users WHERE user_id=?"); err != nil {
+		logger.Fatalf("Error on deleteUser prepare: %v", err)
+	}
+
+	if db.saveUser, err = c.Prepare(`INSERT INTO users
+		(user_id, email, user_name, created, updated, pic_url)
+		VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE
+		user_name = ?, updated = ?, pic_url = ?
+		`); err != nil {
+		logger.Fatalf("Error on insertUser prepare: %v", err)
+	}
+
+	if db.saveQuery, err = c.Prepare(`INSERT INTO queries
+		(query_id, user_id, created, img_url, result)
+		VALUES (?, ?, ?, ?, ?)`); err != nil {
+		logger.Fatalf("Error on insertQuery prepare: %v", err)
+	}
+
+	if db.addSession, err = c.Prepare(`INSERT INTO sessions
+		(session_id, user_id, session_count)
+		VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE
+		session_count = session_count + 1`); err != nil {
+		logger.Fatalf("Error on addSession prepare: %v", err)
+	}
+
+	if db.getSessionCount, err = c.Prepare(`SELECT session_count
+		FROM sessions WHERE session_id = ?`); err != nil {
+		logger.Fatalf("Error on addSession prepare: %v", err)
+	}
+
 }
 
 func closeStore(ctx context.Context) {
-	if dbClient != nil {
-		dbClient.Close()
+	if db != nil && db.conn != nil {
+		db.conn.Close()
 	}
 }
 
 func getUser(ctx context.Context, id string) (usr *ServiceUser, err error) {
 
 	if id == "" {
-		return nil, errors.New("Nil job ID parameter")
+		return nil, errors.New("User ID parameter required")
 	}
 
-	row, err := dbClient.Single().ReadRow(ctx, "Users", spanner.Key{id},
-		[]string{"UserId", "Email", "UserName", "Created", "Updated", "Picture"})
-
+	rows, err := db.getUser.Query(id)
 	if err != nil {
-		if spanner.ErrCode(err) == codes.NotFound {
-			logger.Printf("User not found: %s", id)
-			return nil, nil
-		}
-
 		logger.Printf("Error while quering for user %s: %v", id, err)
 		return nil, err
 	}
+	defer rows.Close()
 
-	var u ServiceUser
-	if err := row.ToStruct(&u); err != nil {
-		logger.Printf("Error while parsing DB user: %v", err)
-		return nil, err
+	var u *ServiceUser
+	for rows.Next() {
+		u = &ServiceUser{}
+		if err := rows.Scan(&u.UserID, &u.Email, &u.UserName,
+			&u.Created, &u.Updated, &u.Picture); err != nil {
+			return nil, err
+		}
 	}
-
-	return &u, nil
-
+	return u, nil
 }
 
 func deleteUser(ctx context.Context, id string) error {
@@ -86,20 +118,12 @@ func deleteUser(ctx context.Context, id string) error {
 		return errors.New("User required")
 	}
 
-	m := spanner.Delete("Users", spanner.Key{id})
-
-	_, err := dbClient.Apply(ctx, []*spanner.Mutation{m}, spanner.ApplyAtLeastOnce())
+	_, err := db.deleteUser.Exec(id)
 	if err != nil {
-		if spanner.ErrCode(err) == codes.NotFound {
-			logger.Printf("User not found: %s", id)
-			return nil
-		}
-		logger.Printf("Error while applying user to DB: %v", err)
-		return err
+		logger.Printf("Error while deleting user %s: %v", id, err)
 	}
 
-	return nil
-
+	return err
 }
 
 func saveUser(ctx context.Context, usr *ServiceUser) error {
@@ -109,13 +133,14 @@ func saveUser(ctx context.Context, usr *ServiceUser) error {
 		return errors.New("User required")
 	}
 
-	m, err := spanner.InsertOrUpdateStruct("Users", usr)
+	_, err := db.saveUser.Exec(
+		usr.UserID, usr.Email, usr.UserName, usr.Created, usr.Updated, usr.Picture,
+		usr.UserName, usr.Updated, usr.Picture)
 	if err != nil {
-		logger.Printf("Error while creating Users insert: %v", err)
-		return err
+		logger.Printf("Error while saving user %v: %v", usr, err)
 	}
 
-	return dbApply(ctx, m)
+	return err
 
 }
 
@@ -126,13 +151,12 @@ func saveQuery(ctx context.Context, q *UserQuery) error {
 		return errors.New("ID required")
 	}
 
-	m, err := spanner.InsertStruct("Queries", q)
+	_, err := db.saveQuery.Exec(q.QueryID, q.UserID, q.Created, q.ImageURL, q.Result)
 	if err != nil {
-		logger.Printf("Error while creating Users insert: %v", err)
-		return err
+		logger.Printf("Error while saving query %v: %v", q, err)
 	}
 
-	return dbApply(ctx, m)
+	return err
 
 }
 
@@ -143,50 +167,42 @@ func countSession(ctx context.Context, userID, sessionID string) (c int64, err e
 		return 0, errors.New("Both, user and session ID required")
 	}
 
+	tx, e := db.conn.Begin()
+	if e != nil {
+		logger.Printf("Error while creating transaction: %v", e)
+	}
+
+	_, e = tx.Stmt(db.addSession).Exec(sessionID, userID, 1)
+	if e != nil {
+		tx.Rollback()
+		logger.Printf("Error while incrementing sessions %s: %v", sessionID, e)
+	}
+
+	rows, err := tx.Stmt(db.getSessionCount).Query(sessionID)
+	if err != nil {
+		tx.Rollback()
+		logger.Printf("Error while quering session %s: %v", sessionID, err)
+		return 0, err
+	}
+	defer rows.Close()
+
 	var sessionCount int64
-	_, err = dbClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
-		row, err := txn.ReadRow(ctx, "Sessions", spanner.Key{sessionID}, []string{"UserCount"})
-		if err != nil {
-			if spanner.ErrCode(err) == codes.NotFound {
-				logger.Printf("No sessions for this user: %s", sessionID)
-				return txn.BufferWrite([]*spanner.Mutation{
-					spanner.Insert("Sessions", []string{"SessionId", "UserId", "UserCount"},
-						[]interface{}{
-							sessionID,
-							userID,
-							int64(1),
-						}),
-				})
-			}
+	for rows.Next() {
+		if err := rows.Scan(&sessionCount); err != nil {
+			tx.Rollback()
+			logger.Printf("Error parsing session incrementing results: %v", err)
 		}
-		if err := row.Column(0, &sessionCount); err != nil {
-			return err
-		}
-		return txn.BufferWrite([]*spanner.Mutation{
-			spanner.Update("Sessions", []string{"SessionId", "UserId", "UserCount"},
-				[]interface{}{
-					sessionID,
-					userID,
-					sessionCount + int64(1),
-				}),
-		})
-	})
-	if err != nil {
-		logger.Printf("Error on count transaction: %v", err)
 	}
 
-	return sessionCount, err
-
-}
-
-func dbApply(ctx context.Context, m *spanner.Mutation) error {
-
-	_, err := dbClient.Apply(ctx, []*spanner.Mutation{m}, spanner.ApplyAtLeastOnce())
+	err = tx.Commit()
 	if err != nil {
-		logger.Printf("Error while applying user to DB: %v", err)
-		return err
+		tx.Rollback()
+		logger.Printf("Error committing session incrementing: %v", err)
+		return 0, err
 	}
 
-	return nil
+	logger.Printf("Session incrementing result: %d", sessionCount)
+
+	return sessionCount, nil
 
 }

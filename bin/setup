@@ -9,22 +9,33 @@ gcloud services enable --quiet \
     cloudbuild.googleapis.com \
     iam.googleapis.com \
     containerregistry.googleapis.com \
-    spanner.googleapis.com \
+    sqladmin.googleapis.com \
     run.googleapis.com
 
 
+
+
 # SQL
-gcloud spanner instances create $SERVICE_NAME \
-    --description "DB for ${SERVICE_NAME}" \
-    --nodes 1 \
-    --config "regional-${SERVICE_REGION}"
+gcloud sql instances create $SERVICE_NAME \
+    --tier $DB_TIER \
+    --region $SERVICE_REGION \
+    --database-version MYSQL_5_6 \
+    --storage-type SSD \
+    --storage-auto-increase
 
-gcloud spanner databases create "${SERVICE_NAME}-db" \
-    --instance $SERVICE_NAME
 
-gcloud spanner databases ddl update "${SERVICE_NAME}-db" \
+gcloud sql users set-password root \
     --instance $SERVICE_NAME \
-    --ddl "$(<schema.ddl)"
+    --host % \
+    --password $DB_ROOT_SECRET
+
+gcloud sql users create "${SERVICE_NAME}-db-user" \
+    --instance $SERVICE_NAME \
+    --host % \
+    --password $DB_USER_SECRET
+
+gcloud sql databases create "${SERVICE_NAME}-db" \
+    --instance $SERVICE_NAME
 
 
 # Account
@@ -49,6 +60,6 @@ gcloud projects add-iam-policy-binding $PROJECT \
 	--member "serviceAccount:${SERVICE_NAME}-sa@${PROJECT}.iam.gserviceaccount.com" \
     --role roles/monitoring.metricWriter
 
-gcloud spanner instances add-iam-policy-binding $SERVICE_NAME \
-    --member "serviceAccount:${SERVICE_NAME}-sa@${PROJECT}.iam.gserviceaccount.com" \
-    --role roles/spanner.databaseUser
+gcloud projects add-iam-policy-binding $PROJECT \
+	--member "serviceAccount:${SERVICE_NAME}-sa@${PROJECT}.iam.gserviceaccount.com" \
+    --role roles/cloudsql.editor
