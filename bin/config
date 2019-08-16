@@ -8,5 +8,3 @@ SERVICE_VERSION="0.2.8"
 
 # GCP metadata
 PROJECT=$(gcloud config get-value project)
-PROJECT_NUM=$(gcloud projects describe ${PROJECT} \
-    --format "value(projectNumber)" )

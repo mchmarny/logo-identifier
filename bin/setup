@@ -13,8 +13,6 @@ gcloud services enable --quiet \
     run.googleapis.com
 
 
-
-
 # SQL
 gcloud sql instances create $SERVICE_NAME \
     --tier db-n1-highmem-2 \
