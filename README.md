@@ -1,10 +1,10 @@
 # logo-identifier
 
-Simple logo identification service demonstrating use of Cloud SQL and Google Vision API in Cloud Run. 
+Simple logo identification service demonstrating use of Cloud SQL and Google Vision API in Cloud Run.
 
 ## Why
 
-Setting up development and deployment pipeline for Cloud Run service backed by project-level authenticated services like Cloud Vision and connection string based authenticated ones like Cloud SQL can be complicated. While logo identification is probably not a real production workload, this sample aims to illustrate all aspects of local development and service deployment on GCP using these services.                       |
+Setting up development and deployment pipeline for Cloud Run service backed by project-level authenticated services like Cloud Vision and connection string based authenticated ones like Cloud SQL can be complicated. While logo identification is probably not representative of a real production workload, this simple service does illustrate all of the aspects of local development and service deployment on Cloud Run.
 
 ## Pre-requirements
 
@@ -14,7 +14,7 @@ If you don't have one already, start by creating new project and configuring [Go
 
 ## Setup
 
-To setup this service you will:
+To setup this service you will need to:
 
 * Configure service dependencies
 * Build docker image from the source in this repo
@@ -34,14 +34,27 @@ cd logo-identifier
 
 ### Configure Dependencies
 
-Before starting, we will need:
+In this section you will:
 
 * Enable required GCP APIs
 * Create Cloud SQL instance and configure it with database and user
 * Create a Service Account and configure it with required IAM policies
 * Configure OAuth credentials with Cloud Run service callback URL
 
-Before we create the Cloud SQL instance and configure database, we need to define a couple of password: default DB user (`root`) and the application specific user (`logoider-db-user`). To do that we will use `openssl`. If for some reason you do not have `openssl` configured you can just set these value to your own secrets. Just don't re-use other secrets or make it too easy to guess.
+#### APIs
+
+First, let's ensure all the required GCP APIs are enabled. To do that, run the [bin/setup](./bin/setup) script:
+
+> Note, to keep this readme short, I will be asking you to execute scripts rather than listing here complete commands. You should really review each one of these scripts for content, and, to understand the individual commands so you can use them in the future.
+
+
+```shell
+bin/setup
+```
+
+#### DB
+
+Before creating Cloud SQL instance, you'll need to define a couple of passwords: default DB user (`root`), and the application specific user (`logoider-db-user`). To do that we will use the `openssl` command line utility. If for some reason you do not have `openssl` configured, you can just set these value to your own secrets.
 
 ```shell
 export DB_ROOT_SECRET=$(openssl rand -base64 16)
@@ -50,19 +63,13 @@ export DB_USER_SECRET=$(openssl rand -base64 16)
 echo "app user password: ${DB_USER_SECRET}"
 ```
 
-Now we are ready to create dependencies by running [bin/setup](./bin/setup) script:
-
-> You should review each one of the provided scripts for content to understand the individual commands
+To create `logoider` CLoud SQL instance, run [bin/db](./bin/db) script:
 
 ```shell
-bin/setup
+bin/db
 ```
 
-#### Cloud SQL (database schema)
-
-One Cloud SQL finished configuring, there number of ways you can use to [connect to your newly created instance](https://cloud.google.com/sql/docs/mysql/external-connection-methods). The by-far easiest is Cloud Shell.
-
-Navigate to [Cloud Shell](https://console.cloud.google.com/) and Connect to your instance:
+One Cloud SQL finished configuring, there number you can [connect to your newly created instance](https://cloud.google.com/sql/docs/mysql/external-connection-methods). The by-far easiest is Cloud Shell. Navigate to [Cloud Shell](https://console.cloud.google.com/) and Connect to your instance:
 
 ```shell
 gcloud sql connect logoider --user=root --quiet
@@ -72,17 +79,33 @@ You will see a message about whitelisting your IP for incoming connection. Just 
 
 > You can print it out in the console where you run original setup `echo DB_ROOT_SECRET`
 
-That will get you to MySQL prompt
+That will get you to MySQL prompt in Cloud Shell:
 
 ```shell
 MySQL [(none)]>
 ```
 
-To create and configure your database schema, copy the entire [schema.ddl](sql/schema.ddl) file, paste it into the Cloud Shell window, and hit enter. You should see SQL output with 4 `Query OK` entries. You can now close the Cloud Shell window.
+To create and configure your database schema, review and copy the entire [schema.ddl](sql/schema.ddl) file, paste it into the Cloud Shell window, and hit enter. You should see SQL output with 4 `Query OK` entries. You can now close the Cloud Shell window.
+
+#### IAM
+
+To ensure that your Cloud RUn service is able to do only the intended tasks and nothing more, you will create a service account which will be used to run the Cloud Run service and configure it with a few explicit roles:
+
+* `run.invoker` - required to execute Cloud Run service
+* `cloudsql.editor` - required to connect and write/read/delete on Cloud SQL
+* `logging.logWriter` - required for Stackdriver logging
+* `cloudtrace.agent` - required for Stackdriver tracing
+* `monitoring.metricWriter` - required to write custom metrics to Stackdriver
+
+To create and configure `logoider-sa` service account, run [bin/user](./bin/user) script:
+
+```shell
+bin/user
+```
 
 #### OAuth (chicken and an egg)
 
-Cloud Run service URLs are not currently predictable. To deploy Cloud Run service will need the OAuth credentials and to configure those we will need a call back URL that includes the Cloud Run service URL. You can see the chicken and an egg situation here. To work around it, we will deploy service first and then come back here and update the OAuth settings.
+Cloud Run service URLs are not currently predictable. To deploy Cloud Run service you will need the OAuth credentials. To configure those credentials, you will need a callback URL that includes the Cloud Run service URL. You can see the chicken and an egg situation here. To work around it, we will deploy service first and then come back here and update the OAuth settings.
 
 ### Build Container Image
 
@@ -120,9 +143,6 @@ export LI_OAUTH_CLIENT_ID=""
 export LI_OAUTH_CLIENT_SECRET=""
 ```
 
->
-To protect you and your users, Google only allows applications that authenticate using OAuth to use Authorized Domains. Your applications' links must be hosted on Authorized Domains. Learn more
-
 > You will also have to add the service URL to Authorized Domains section on the OAuth consent screen. More on that [here](https://support.google.com/cloud/answer/6158849?hl=en#authorized-domains)
 
 ### Deploy the Cloud Run Service (agin)
@@ -141,12 +161,11 @@ You can access the The Icon Identifier application by navigating to the deployed
 bin/url
 ```
 
-To use the application:
+Once you access the deployed application:
 
 * Click on "Sign in With Google" and follow the OAuth prompts
-* Once authenticated
-  * Click on any of the provided logos (populates image URL)
-  * Click "Identify" button to see it's description
+* Once authenticated, click on any of the provided logos (populates image URL)
+* Click "Identify" button to see it's description
 
 > You can also use any other publicly accessible logo image by pasting its URL
 

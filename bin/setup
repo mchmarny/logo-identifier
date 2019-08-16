@@ -3,7 +3,7 @@
 DIR="$(dirname "$0")"
 . "${DIR}/config"
 
-# Required services
+
 gcloud services enable --quiet \
     compute.googleapis.com \
     cloudbuild.googleapis.com \
@@ -12,51 +12,3 @@ gcloud services enable --quiet \
     sqladmin.googleapis.com \
     run.googleapis.com
 
-
-# SQL
-gcloud sql instances create $SERVICE_NAME \
-    --tier db-n1-highmem-2 \
-    --region $SERVICE_REGION \
-    --database-version MYSQL_5_6 \
-    --storage-type SSD \
-    --storage-auto-increase
-
-gcloud sql databases create "${SERVICE_NAME}-db" \
-    --instance $SERVICE_NAME
-
-gcloud sql users set-password root \
-    --instance $SERVICE_NAME \
-    --host % \
-    --password $DB_ROOT_SECRET
-
-gcloud sql users create "${SERVICE_NAME}-db-user" \
-    --instance $SERVICE_NAME \
-    --host % \
-    --password $DB_USER_SECRET
-
-
-# Account
-gcloud iam service-accounts create "${SERVICE_NAME}-sa" \
-    --display-name "Service Invoker Account for ${SERVICE_NAME}" \
-    --quiet
-
-gcloud beta run services add-iam-policy-binding $SERVICE_NAME \
-	--member "serviceAccount:${SERVICE_NAME}-sa@${PROJECT}.iam.gserviceaccount.com" \
-	--region "${SERVICE_REGION}" \
-	--role roles/run.invoker
-
-gcloud projects add-iam-policy-binding $PROJECT \
-	--member "serviceAccount:${SERVICE_NAME}-sa@${PROJECT}.iam.gserviceaccount.com" \
-    --role roles/logging.logWriter
-
-gcloud projects add-iam-policy-binding $PROJECT \
-	--member "serviceAccount:${SERVICE_NAME}-sa@${PROJECT}.iam.gserviceaccount.com" \
-    --role roles/cloudtrace.agent
-
-gcloud projects add-iam-policy-binding $PROJECT \
-	--member "serviceAccount:${SERVICE_NAME}-sa@${PROJECT}.iam.gserviceaccount.com" \
-    --role roles/monitoring.metricWriter
-
-gcloud projects add-iam-policy-binding $PROJECT \
-	--member "serviceAccount:${SERVICE_NAME}-sa@${PROJECT}.iam.gserviceaccount.com" \
-    --role roles/cloudsql.editor

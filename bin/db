@@ -1,0 +1,26 @@
+#!/bin/bash
+
+DIR="$(dirname "$0")"
+. "${DIR}/config"
+
+
+gcloud sql instances create $SERVICE_NAME \
+    --tier db-n1-highmem-2 \
+    --region $SERVICE_REGION \
+    --database-version MYSQL_5_6 \
+    --storage-type SSD \
+    --storage-auto-increase
+
+gcloud sql databases create "${SERVICE_NAME}-db" \
+    --instance $SERVICE_NAME
+
+gcloud sql users set-password root \
+    --instance $SERVICE_NAME \
+    --host % \
+    --password $DB_ROOT_SECRET
+
+gcloud sql users create "${SERVICE_NAME}-db-user" \
+    --instance $SERVICE_NAME \
+    --host % \
+    --password $DB_USER_SECRET
+
