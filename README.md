@@ -1,10 +1,10 @@
 # logo-identifier
 
-Simple Cloud Run service demonstrating use of Google Vision API and Cloud SQL as backing services for log identification with rate limiting and service usage metrics in Stackdriver.
+Simple logo identification service demonstrating use of Cloud SQL and Google Vision API in Cloud Run. 
 
 ## Why
 
-Setting up development and deployment pipeline for Cloud Run service backed by project-level authenticated services like Cloud Vision and connection string based ones like Cloud Run can be complicated. While logo identification is probably not a real production workload, this sample aims to illustrate all aspects of local development and service deployment on GCP using these services.                       |
+Setting up development and deployment pipeline for Cloud Run service backed by project-level authenticated services like Cloud Vision and connection string based authenticated ones like Cloud SQL can be complicated. While logo identification is probably not a real production workload, this sample aims to illustrate all aspects of local development and service deployment on GCP using these services.                       |
 
 ## Pre-requirements
 
