@@ -2,6 +2,8 @@
 
 Simple logo identification service demonstrating use of Cloud SQL and Google Vision API in Cloud Run.
 
+Demo: https://logoider-2gtouos2pq-uc.a.run.app
+
 ## Why
 
 Setting up development and deployment pipeline for Cloud Run service backed by project-level authenticated services like Cloud Vision and connection string based authenticated ones like Cloud SQL can be complicated. While logo identification is probably not representative of a real production workload, this simple service does illustrate all of the aspects of local development and service deployment on Cloud Run.
