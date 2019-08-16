@@ -17,12 +17,14 @@ gcloud services enable --quiet \
 
 # SQL
 gcloud sql instances create $SERVICE_NAME \
-    --tier $DB_TIER \
+    --tier db-n1-highmem-2 \
     --region $SERVICE_REGION \
     --database-version MYSQL_5_6 \
     --storage-type SSD \
     --storage-auto-increase
 
+gcloud sql databases create "${SERVICE_NAME}-db" \
+    --instance $SERVICE_NAME
 
 gcloud sql users set-password root \
     --instance $SERVICE_NAME \
@@ -33,9 +35,6 @@ gcloud sql users create "${SERVICE_NAME}-db-user" \
     --instance $SERVICE_NAME \
     --host % \
     --password $DB_USER_SECRET
-
-gcloud sql databases create "${SERVICE_NAME}-db" \
-    --instance $SERVICE_NAME
 
 
 # Account

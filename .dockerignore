@@ -1,8 +1,22 @@
+
+# OS specific
+.DS_Store
+
+# commands
+/bin
+
+# repo files
+README.md
 .git
 .gitignore
-.DS_Store
-coverage.out
-/bin
-README.md
+
+# tests
 *_test.go
+coverage.out
+
+# local build
 app
+
+# static sources
+static/js/app-src.js
+static/css/app-src.css

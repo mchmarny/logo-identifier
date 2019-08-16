@@ -15,5 +15,6 @@ go build -a -tags netgo \
 
 
 export RELEASE="v${SERVICE_VERSION}"
+export DSN="${SERVICE_NAME}:test@tcp(127.0.0.1:3306)/${SERVICE_NAME}-db?parseTime=true"
 
 bin/app

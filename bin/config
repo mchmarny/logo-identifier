@@ -3,8 +3,7 @@
 # Global config
 SERVICE_NAME="logoider"
 SERVICE_REGION="us-central1"
-DB_TIER="db-n1-highmem-2"
-SERVICE_VERSION="0.2.6"
+SERVICE_VERSION="0.2.8"
 
 
 # GCP metadata
