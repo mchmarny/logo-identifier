@@ -3,7 +3,7 @@
 # Global config
 SERVICE_NAME="logoider"
 SERVICE_REGION="us-central1"
-SERVICE_VERSION="0.2.8"
+SERVICE_VERSION="0.2.9"
 
 
 # GCP metadata
